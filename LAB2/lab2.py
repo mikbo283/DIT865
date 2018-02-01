@@ -15,6 +15,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score
 
 #from pandas import DataFrame
 #df = DataFrame.from_csv("train.tsv", sep="\t")
@@ -30,6 +31,19 @@ print df.head()
 
 ytrain = df[df.columns[0]]
 xtrain = df[df.columns[1]]
+
+## Reads the development file
+with open('dev.tsv') as f:
+    dfdev = pd.read_table(f, sep='\t',header=None)
+
+## Prints some information about the data frame
+print dfdev.shape
+print dfdev.head()
+
+ydev = dfdev[dfdev.columns[0]]
+xdev = dfdev[dfdev.columns[1]]
+
+
 
 ## The given tokenizer
 tokenize_re = re.compile(r'''
@@ -70,8 +84,10 @@ CountVectorizer(tokenizer = tokenize),
 print(cross_validate(pipeline_dummy, xtrain, ytrain))
 
 
+####################################################################
+############################ Decision Tree #########################
+####################################################################
 
-############################ Decision Tree
 pipeline_tree = make_pipeline(
 CountVectorizer(tokenizer = tokenize),
     SelectPercentile(percentile=10),
@@ -101,12 +117,25 @@ print(res.max())
 
 ## Max deapth = 183, score = 0.66
 
-    
+## PREDICTION: TREE
 
+pipeline_tree_best = make_pipeline(
+    CountVectorizer(tokenizer = tokenize),
+    StandardScaler(with_mean=False),
+    SelectPercentile(percentile=10),
+    DecisionTreeClassifier(max_depth=183)
+)
 
+model_tree = pipeline_tree_best.fit(xtrain,ytrain)
 
+Yguess = model_tree.predict(xdev)
+print(accuracy_score(ydev, Yguess))
+## Score: 0.579    
 
-########################### Random Forest
+####################################################################
+########################### Random Forest ##########################
+####################################################################
+
 pipeline_RF = make_pipeline(
 CountVectorizer(tokenizer = tokenize),
     SelectPercentile(percentile=10),
@@ -134,8 +163,26 @@ print(param[np.argmax(res)])
 
 ## number of trees: 59, max depth = 135, score: 0.66
 
+## Predict RF
 
-## Gradient boosted classifier
+pipeline_RF_best = make_pipeline(
+CountVectorizer(tokenizer = tokenize),
+    StandardScaler(with_mean=False),
+    SelectPercentile(percentile=10),
+    RandomForestClassifier(n_estimators = 59, max_depth = 135)
+)
+
+model_RF = pipeline_RF_best.fit(xtrain,ytrain)
+
+Yguess = model_RF.predict(xdev)
+print(accuracy_score(ydev, Yguess))
+
+## Score: 0.61
+
+####################################################################
+############### Gradient boosted classifier ########################
+####################################################################
+
 pipeline_GBC = make_pipeline(
 CountVectorizer(tokenizer = tokenize),
     SelectPercentile(percentile=10),
@@ -143,8 +190,44 @@ CountVectorizer(tokenizer = tokenize),
 )
 
 print(cross_validate(pipeline_GBC, xtrain, ytrain))
+## Default: 0.66
 
-## Logistic Regression
+rates = np.random.rand(10)
+res = np.zeros(10)
+for x in np.arange(0,1):
+    pipeline_GBC = make_pipeline(
+        CountVectorizer(tokenizer = tokenize),
+        SelectPercentile(percentile=10),
+        GradientBoostingClassifier(learning_rate = rates[x])
+    )
+    cv = cross_validate(pipeline_GBC, xtrain, ytrain)
+    res[x] = cv['test_score'].mean()
+
+print(rates[np.argmax(res)])
+print(res.max())
+## learning rate = 0.427: 0.68
+
+### Predict GBC
+
+pipeline_GBC_best = make_pipeline(
+CountVectorizer(tokenizer = tokenize),
+    StandardScaler(with_mean=False),
+    SelectPercentile(percentile=10),
+    GradientBoostingClassifier(learning_rate = 0.427)
+)
+
+model_GBC = pipeline_GBC_best.fit(xtrain,ytrain)
+
+Yguess = model_GBC.predict(xdev)
+print(accuracy_score(ydev, Yguess))
+
+## Score: 0.649
+
+
+####################################################################
+##################### Logistic Regression ##########################
+####################################################################
+
 pipeline_LR = make_pipeline(
 CountVectorizer(tokenizer = tokenize),
     SelectPercentile(percentile=10),
@@ -161,12 +244,31 @@ CountVectorizer(tokenizer = tokenize),
 )
 
 print(cross_validate(pipeline_SVC, xtrain, ytrain))
+## Default: 0.685
 
-## Neural Network
+#### Predict LR
+
+pipeline_LR_best = make_pipeline(
+CountVectorizer(tokenizer = tokenize),
+    StandardScaler(with_mean=False),
+    SelectPercentile(percentile=10),
+    LogisticRegression()
+)
+
+model_LR = pipeline_LR_best.fit(xtrain,ytrain)
+
+Yguess = model_LR.predict(xdev)
+print(accuracy_score(ydev, Yguess))
+
+##Score: 0.636
+
+####################################################################
+###################### Neural Network ##############################
+####################################################################
 pipeline_NN = make_pipeline(
 CountVectorizer(tokenizer = tokenize),
     SelectPercentile(percentile=10),
-    MLPClassifier(hidden_layer_sizes =(200))
+    MLPClassifier(hidden_layer_sizes =(300))
 )
 
 print(cross_validate(pipeline_NN, xtrain, ytrain))
@@ -175,4 +277,20 @@ print(cross_validate(pipeline_NN, xtrain, ytrain))
 ## 50 50 50: 0.63
 ## 100 100 100 100: 0.63
 ## 200: 0.64
+## 300: 0.645
 ## Wider is better but takes longer
+
+pipeline_NN_best = make_pipeline(
+    CountVectorizer(tokenizer = tokenize),
+    StandardScaler(with_mean=False),
+    SelectPercentile(percentile=10),
+    MLPClassifier(hidden_layer_sizes =(300))
+)
+
+model_NN = pipeline_NN_best.fit(xtrain,ytrain)
+
+Yguess = model_NN.predict(xdev)
+print(accuracy_score(ydev, Yguess))
+
+## Score: 0.636
+
